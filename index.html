@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FAI — Fundamental AI (v1.3 + Auto News)</title>
+  <style>
+    :root{--bg:#0b0f14;--panel:#131a22;--muted:#7b8aa3;--text:#e7eef8;--accent:#19c3a3;--accent2:#4bc1ff;--bad:#ff6b6b;--ok:#19c3a3;--ring:rgba(255,255,255,.08);--radius:16px}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial,sans-serif;color:var(--text);
+      background:radial-gradient(1200px 700px at 20% -10%, rgba(25,195,163,.10), transparent 60%),
+                 radial-gradient(900px 600px at 90% 0%, rgba(75,193,255,.10), transparent 60%),#0b0f14}
+    .wrap{max-width:1200px;margin:0 auto;padding:28px 18px 80px}
+    header{display:flex;gap:14px;align-items:center;margin-bottom:18px}
+    .logo{display:flex;gap:10px;align-items:center;font-weight:800;letter-spacing:.3px}
+    .dot{width:10px;height:10px;border-radius:999px;background:var(--accent);box-shadow:0 0 18px var(--accent)}
+    .hint{color:var(--muted);font-size:13px}
+    .panel{background:rgba(19,26,34,.88);backdrop-filter:blur(8px);border:1px solid var(--ring);
+      border-radius:var(--radius);padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+    .input{flex:1;min-width:220px;background:#0f1620;border:1px solid var(--ring);color:var(--text);
+      border-radius:12px;padding:12px 14px;outline:none;font-size:15px}
+    .btn{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#03161a;border:none;border-radius:12px;
+      padding:12px 18px;font-weight:800;letter-spacing:.3px;cursor:pointer;box-shadow:0 8px 18px rgba(25,195,163,.35)}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:14px}
+    .card{grid-column:span 3;min-height:110px}
+    .wide{grid-column:span 6}.full{grid-column:span 12}
+    .label{color:var(--muted);font-size:13px;letter-spacing:.2px}
+    .value{font-size:28px;font-weight:800}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .good{color:var(--ok)} .bad{color:var(--bad)}
+    pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:13px;color:#b8c7da}
+    .chip{padding:6px 10px;border:1px solid var(--ring);border-radius:999px;background:#0f1620;cursor:pointer}
+    .chip:hover{border-color:rgba(255,255,255,.15)}
+    table{width:100%;border-collapse:separate;border-spacing:0 10px}
+    th,td{padding:10px 12px;text-align:left}
+    tbody tr{background:rgba(19,26,34,.88);border:1px solid var(--ring)}
+    tbody tr td:first-child{border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tbody tr td:last-child{border-top-right-radius:12px;border-bottom-right-radius:12px}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--ring);color:#cfe6f9}
+    .b-low{background:rgba(25,195,163,.15)} .b-med{background:rgba(75,193,255,.15)}
+    .b-high{background:rgba(255,107,107,.15)} .b-ext{background:rgba(255,107,107,.25)}
+    a.news{color:#cfe6f9;text-decoration:none;border-bottom:1px dotted rgba(255,255,255,.25)}
+    a.news:hover{opacity:.85}
+    @media(max-width:980px){.card{grid-column:span 6}.wide,.full{grid-column:span 12}}
+    @media(max-width:560px){.row{flex-direction:column;align-items:stretch}.btn{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo"><span class="dot"></span> FAI — Fundamental AI</div>
+      <div class="hint">v1.3 • локально из FastAPI</div>
+    </header>
+
+    <!-- Верхняя панель -->
+    <div class="panel">
+      <div class="row">
+        <input id="symbol" class="input mono" value="BTC" placeholder="BTC / ETH / SOL" />
+        <button id="go" class="btn" onclick="run()">Analyze</button>
+        <div class="hint">Примеры:
+          <span class="chip" onclick="pick('BTC')">BTC</span>
+          <span class="chip" onclick="pick('ETH')">ETH</span>
+          <span class="chip" onclick="pick('SOL')">SOL</span>
+          <span class="chip" onclick="pick('BNB')">BNB</span>
+          <span class="chip" onclick="pick('XRP')">XRP</span>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="hint" style="display:flex;align-items:center;gap:8px">
+          <input id="autoNews" type="checkbox" checked> Автообновление новостей каждые 10 мин
+        </label>
+        <button class="btn" style="padding:8px 12px" onclick="refreshNewsOnly()">Обновить новости</button>
+      </div>
+    </div>
+
+    <!-- Карточки-метрики -->
+    <div class="grid">
+      <div class="panel card">
+        <div class="label">F-Score</div>
+        <div id="fscore" class="value">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Вероятность ↑</div>
+        <div id="up" class="value good">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Вероятность ↓</div>
+        <div id="down" class="value bad">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Изменение за 24h</div>
+        <div id="ch24" class="value">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Диапазон 24h</div>
+        <div id="range" class="value">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Капитализация</div>
+        <div id="cap" class="value">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Объём 24h</div>
+        <div id="vol" class="value">—</div>
+      </div>
+
+      <div class="panel card wide">
+        <div class="label">Текущая цена (USD)</div>
+        <div id="price" class="value mono">—</div>
+      </div>
+
+      <div class="panel card wide">
+        <div class="label">Риск / Макро-комментарий</div>
+        <div id="macro" class="value" style="font-size:16px;font-weight:600;line-height:1.4">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Рекомендация</div>
+        <div id="rec" class="value">—</div>
+      </div>
+
+      <div class="panel card">
+        <div class="label">Тональность новостей</div>
+        <div id="nsent" class="value">—</div>
+      </div>
+
+      <div class="panel card full">
+        <div class="label">AI-сводка</div>
+        <pre id="summary">—</pre>
+      </div>
+
+      <div class="panel card full">
+        <div class="label">Заголовки (последние)</div>
+        <div id="newslist" class="hint">—</div>
+      </div>
+    </div>
+
+    <!-- Топ-активы и сравнение -->
+    <div class="grid" style="margin-top:18px">
+      <div class="panel full">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="label" style="font-size:14px">Топ крипто по капе (для быстрого выбора)</div>
+          <button class="btn" onclick="loadTop()">Обновить список</button>
+        </div>
+        <div id="top" class="row" style="margin-top:12px;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
+      <div class="panel full">
+        <div class="label" style="font-size:14px;margin-bottom:8px">Сравнение активов</div>
+        <div class="row" style="margin-bottom:10px">
+          <input id="cmp" class="input mono" placeholder="BTC, ETH, SOL" />
+          <button class="btn" onclick="compare()">Compare</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr><th>Symbol</th><th>Price</th><th>24h%</th><th>Market Cap</th><th>Volume</th><th>Risk</th><th>F-Score</th><th>News</th></tr>
+            </thead>
+            <tbody id="cmpBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'http://localhost:8000';
+
+    function pick(sym){ document.getElementById('symbol').value = sym; run(); }
+    function setText(sel, val){ const el=document.querySelector(sel); if(el) el.textContent = val; }
+    function pct(x){ return (typeof x==='number') ? (x*100).toFixed(1)+'%' : '—'; }
+    function fnum(n){ return (n==null) ? '—' : Number(n).toLocaleString('en-US',{maximumFractionDigits:8}); }
+    function badgeRisk(r){ const map={Low:'b-low',Medium:'b-med',High:'b-high',Extreme:'b-ext'}; const cls=map[r]||'b-med'; return `<span class="badge ${cls}">${r||'?'}</span>`; }
+    function newsColor(label){ if(label==='Positive') return '<span class="good">Positive</span>'; if(label==='Negative') return '<span class="bad">Negative</span>'; return 'Neutral'; }
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    function renderNewsBlock(d){
+      const list = document.getElementById('newslist');
+      const items = d?.news?.samples || [];
+      list.innerHTML = items.length
+        ? items.map(it=>`<div>• <a class="news" href="${it.url}" target="_blank" rel="noopener">${escapeHtml(it.title)}</a></div>`).join('')
+        : 'Нет свежих заголовков или достигнут лимит API.';
+    }
+
+    async function run(){
+      const btn=document.getElementById('go');
+      const symbol=document.getElementById('symbol').value.trim().toUpperCase();
+      if(!symbol) return;
+      btn.disabled=true; btn.textContent='Analyzing…';
+      try{
+        const res=await fetch(`${API}/api/analyze-asset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol})});
+        if(!res.ok){ throw new Error(`HTTP ${res.status}`); }
+        const d=await res.json();
+
+        setText('#fscore', d.f_score ?? '—');
+        setText('#up',     pct(d.prediction_24h?.prob_up));
+        setText('#down',   pct(d.prediction_24h?.prob_down));
+        setText('#range',  d.prediction_24h ? `${d.prediction_24h.expected_min_change_pct}% — ${d.prediction_24h.expected_max_change_pct}%` : '—');
+        setText('#price',  fnum(d.spot?.usd));
+        setText('#macro',  d.macro_summary?.text || '—');
+        setText('#summary', d.prediction_24h?.ai_summary || '—');
+
+        // Изменение 24h с подсветкой
+        const chEl=document.querySelector('#ch24');
+        if (d.metrics?.change_24h_pct!=null){
+          const ch=d.metrics.change_24h_pct;
+          chEl.textContent=ch.toFixed(2)+'%';
+          chEl.classList.remove('good','bad');
+          if(ch>0.3) chEl.classList.add('good'); else if(ch<-0.3) chEl.classList.add('bad');
+        } else { chEl.textContent='—'; chEl.classList.remove('good','bad'); }
+
+        setText('#cap', d.metrics?.market_cap?.toLocaleString('en-US') ?? '—');
+        setText('#vol', d.metrics?.volume_24h?.toLocaleString('en-US') ?? '—');
+
+        // Новые поля
+        const rec=d.prediction_24h?.recommendation||null;
+        const conf=d.prediction_24h?.confidence!=null?Math.round(d.prediction_24h.confidence*100)+'%':'';
+        setText('#rec', rec ? `${rec} ${conf?`(${conf})`:''}` : '—');
+        document.getElementById('nsent').innerHTML = d.news?.sentiment ? newsColor(d.news.sentiment) : '—';
+        renderNewsBlock(d);
+      }catch(e){
+        alert('Ошибка: '+e.message);
+        console.error(e);
+      }finally{
+        btn.disabled=false; btn.textContent='Analyze';
+      }
+    }
+
+    async function refreshNewsOnly(){
+      const symbol=document.getElementById('symbol').value.trim().toUpperCase();
+      if(!symbol) return;
+      try{
+        const res=await fetch(`${API}/api/analyze-asset`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol})});
+        if(!res.ok) return;
+        const d=await res.json();
+        document.getElementById('nsent').innerHTML = d.news?.sentiment ? newsColor(d.news.sentiment) : '—';
+        renderNewsBlock(d);
+      }catch(_e){/* тихо */}
+    }
+
+    let newsTimer=null;
+    function setupAutoNews(){
+      const cb=document.getElementById('autoNews');
+      if(newsTimer){ clearInterval(newsTimer); newsTimer=null; }
+      if(cb && cb.checked){ newsTimer=setInterval(refreshNewsOnly, 10*60*1000); }
+    }
+    document.addEventListener('change', (e)=>{ if(e.target && e.target.id==='autoNews'){ setupAutoNews(); } });
+
+    async function loadTop(){
+      const box=document.getElementById('top'); box.innerHTML='<span class="hint">Загрузка…</span>';
+      try{
+        const res=await fetch(`${API}/api/top-crypto?limit=12`); const d=await res.json();
+        box.innerHTML=d.items.map(it=>`
+          <span class="chip" title="${it.name} • ${it.price_usd} USD" onclick="pick('${it.symbol.toUpperCase()}')">
+            ${it.symbol.toUpperCase()} · ${Number(it.price_usd).toLocaleString('en-US')}
+          </span>`).join('');
+      }catch(e){ box.innerHTML='<span class="hint">Не удалось загрузить список</span>'; }
+    }
+
+    async function compare(){
+      const body=document.getElementById('cmpBody');
+      const raw=document.getElementById('cmp').value||'';
+      const syms=raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean);
+      if(!syms.length){ body.innerHTML=''; return; }
+      body.innerHTML=`<tr><td colspan="8" class="hint">Считаем…</td></tr>`;
+      try{
+        const res=await fetch(`${API}/api/compare-assets`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:syms})});
+        const d=await res.json();
+        body.innerHTML=d.items.map(x=>{
+          const ch=(x.change_24h_pct!=null)?x.change_24h_pct.toFixed(2)+'%':'—';
+          const chCls=(x.change_24h_pct>0.3)?'good':(x.change_24h_pct<-0.3)?'bad':'';
+          return `<tr>
+            <td class="mono">${x.symbol}</td>
+            <td class="mono">${fnum(x.price_usd)}</td>
+            <td class="${chCls}">${ch}</td>
+            <td class="mono">${x.market_cap?.toLocaleString('en-US') ?? '—'}</td>
+            <td class="mono">${x.volume_24h?.toLocaleString('en-US') ?? '—'}</td>
+            <td>${badgeRisk(x.risk)}</td>
+            <td class="mono">${x.f_score ?? '—'}</td>
+            <td>${x.news || '—'}</td>
+          </tr>`;}).join('');
+      }catch(e){ body.innerHTML=`<tr><td colspan="8" class="hint">Ошибка: ${e.message}</td></tr>`; }
+    }
+
+    // автоинициализация
+    loadTop(); run(); setupAutoNews();
+  </script>
+</body>
+</html>
